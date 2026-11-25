@@ -1,0 +1,4 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const c=vm.createContext({});for(const f of ['CapacityRules','App'])vm.runInContext(fs.readFileSync('src/'+f+'.gs','utf8'),c);
+test('RPC fails closed',()=>assert.equal(c.rpc({action:'book'}).ok,false));
+test('half-open interval boundaries',()=>{assert.equal(c.CapacityRules.overlaps({start:0,end:10},{start:10,end:20}),false);assert.equal(c.CapacityRules.overlaps({start:0,end:11},{start:10,end:20}),true)});
+test('timer alone cannot certify readiness',()=>{const x={glueStart:0,now:1800000,glueComplete:true,safeSettingComplete:true};assert.equal(c.CapacityRules.stylingReady(x),false);assert.equal(c.CapacityRules.stylingReady({...x,confirmed:true}),true);assert.equal(c.CapacityRules.stylingReady({...x,confirmed:true,now:1799999}),false)});

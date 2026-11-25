@@ -1,0 +1,693 @@
+Hybrid Capacity + Stage Queues
+
+Salon Operations V2 — Review and development
+
+I've reviewed the Salon Operations V2 — Appointment, Queue & Scheduling Design document. I agree with its recommendation to adopt the Hybrid Capacity + Stage Queues approach. It is particularly suitable for your business because wig installation is a multi-stage service involving different technicians, rather than a conventional salon appointment where one stylist handles a client from beginning to end.
+
+The document provides a strong architectural foundation, particularly around capacity reservations, flexible staff allocation, service dependencies, queue fairness and integration with sales (source: lines 19–36).
+
+However, I would develop it further before implementation. It explains what the system should achieve, but we still need to establish precisely how the system will make decisions throughout a working day, with minimal intervention from receptionists and managers.
+
+I would design the system around three interconnected objectives:
+
+Capacity management: Determine how many clients we can accept and when.
+
+Client flow management: Determine where each client should be at any given time.
+
+Staff allocation: Determine who should attend to which client next.
+
+The booking system should ultimately be a component of a larger Salon Operations Management System, rather than the other way around.
+
+1. Understanding the hybrid approach
+
+Advance bookings (pooled or named stylist) / Walk-in clients (capacity-based admission)
+
+↓ Capacity & scheduling engine (staff, skills, stations, time)
+
+↓ Check-in & digital ticket
+
+↓ Natural hair prep (wash, blow-dry, plait) / Wig preparation (straighten, curl)
+
+↓ Gluing & setting (readiness confirmation) → Styling queue (next qualified stylist)
+
+↓ Quality check & checkout
+
+Illustrative client flow. Optional stages are skipped according to the selected service.
+
+The hybrid approach separates two things that traditional appointment systems often treat as one:
+
+Capacity reservation | Stage queues
+
+Plans future work | Coordinates current work
+
+Determines whether a booking can be accepted | Determines who should be served next
+
+Protects appointment commitments | Responds to actual salon conditions
+
+Uses estimated durations | Uses actual service progress
+
+Provisionally allocates resources | Assigns actual technicians
+
+
+
+You need both. A queue without capacity planning leads to overcrowding. Capacity planning without dynamic queues becomes too rigid when clients arrive late or services overrun.
+
+2. What exactly should a client book?
+
+I would retain the convenience of selecting appointment times but change what those times represent internally.
+
+A client should normally book a service at a branch, rather than a particular stylist or a styling chair for one hour.
+
+There should be three booking types:
+
+Booking type | Staff allocation | Capacity reserved
+
+Standard appointment | Any qualified stylist | Yes
+
+Preferred stylist appointment | Specific stylist for relevant stages | Yes
+
+Walk-in ticket | Next suitable available stylist | Upon admission
+
+
+
+For ordinary appointments, the system should determine the actual stylist close to the time the client is ready for styling.
+
+Internally, each appointment should have separate timestamps for:
+
+Expected arrival.
+
+Expected first service.
+
+Expected gluing.
+
+Expected styling.
+
+Expected completion.
+
+The document already recommends separating arrival, first-service start and estimated finish. I would make this distinction a fundamental requirement of the system (source: lines 19–32).
+
+For example, a client requesting a standard installation with natural hair preparation might receive the following confirmation:
+
+Appointment confirmed — Standard full frontal installation | Details
+
+Arrival time | 10:00 AM
+
+Estimated service start | 10:00–10:15 AM
+
+Estimated completion | 11:45 AM–12:00 PM
+
+Stylist | Next qualified stylist
+
+Natural hair preparation | KES 500
+
+Installation | KES 1,000
+
+Booking deposit | − KES 500
+
+Estimated balance | KES 1,000
+
+
+
+Illustrative booking confirmation, not a live appointment.
+
+The client does not necessarily need to see the detailed internal schedule. That complexity should remain with the system.
+
+3. Develop a service routing catalogue
+
+Before building the scheduling engine, we need to establish a catalogue of service routes.
+
+Currently, we know the prices of the services, but the system also needs to understand their operational requirements.
+
+For instance, a KES 2,000 frontal installation is not simply a more expensive version of a KES 1,000 installation. It requires a different allocation of time and resources.
+
+I would start with the following provisional service durations.
+
+Service stage | Estimated duration | Resource required
+
+Washing | 10 min | Prep technician
+
+Blow-drying | 10 min | Prep technician
+
+Plaiting | 20 min | Prep technician
+
+Standard gluing | 15 min | Gluing technician
+
+Adhesive setting | 15 min* | Setting station
+
+Standard styling | 30 min | Stylist
+
+Complex styling | 60 min | Stylist
+
+Glueless application | 10 min | Qualified technician
+
+Wig straightening | 30 min | Qualified technician
+
+Wig curling | 30 min | Qualified technician
+
+Styling only | 30 min | Stylist
+
+Frontal ponytail installation | 120 min | Multiple stages
+
+Double frontal installation | To be measured | Multiple stages
+
+
+
+These are proposed planning estimates, not measured staff performance standards. Adhesive setting must follow product requirements and actual technician-confirmed readiness.
+
+Interactive service route example (static equivalent)
+
+Select natural hair preparation: wash, blow-dry, plait. Wig preparation: none, straightening or curling. Installation type: adhesive or glueless. Styling complexity: standard (30 minutes), complex (60 minutes), extended (90 minutes).
+
+Default example: washing 10 min → blow-drying 10 min → plaiting 20 min → gluing 15 min → setting 15 min → styling 30 min. Estimated service duration: 1h 40m. Hands-on technician time: 85 min. Estimated service cost: KES 1,500.
+
+Sequential planning example. Excludes queue delays, check-in, checkout and buffers. Complex styling is assumed to have no additional charge in this example. Add 30 minutes and KES 1,000 for wig straightening or curling. Glueless application replaces the adhesive and setting stages with 10 minutes and reduces the installation price to KES 800. Individual prep prices: wash 100, blow-dry 100, plait 200; all three together 500.
+
+This is essentially what the receptionist should be able to do when creating a booking. They select the services, and the system automatically generates the required stages.
+
+The receptionist should not have to calculate the duration manually.
+
+4. The capacity engine
+
+This is arguably the most important part of the entire system.
+
+Instead of asking how many appointments are available at 10:00 AM, the system should ask:
+
+Can we accommodate another client's complete service journey without compromising existing commitments?
+
+Consider an illustrative branch with the following staffing configuration.
+
+Branch capacity simulator (static equivalent)
+
+Input | Default
+
+Prep technicians | 2
+
+Gluing technicians | 2
+
+Stylists | 5
+
+Setting seats | 3
+
+Clients requiring full natural hair prep | 50%
+
+Average styling duration | 30 min
+
+Recovery capacity allowance | 15%
+
+Natural hair preparation capacity | 6/hr
+
+Gluing capacity | 8/hr
+
+Setting seats capacity | 12/hr
+
+Styling capacity | 10/hr
+
+Maximum theoretical throughput | 6/hr
+
+Buffered planning throughput | 5.1/hr
+
+Bottleneck | Natural hair preparation
+
+
+
+Calculation: prep capacity = staff × 60 ÷ (40 × prep proportion); gluing = staff × 60 ÷ 15; setting = seats × 60 ÷ 15; styling = stylists × 60 ÷ average styling duration. The minimum is the bottleneck; multiply by (1 − recovery allowance) for buffered throughput.
+
+Assumes dedicated staff, adequate equipment, all clients requiring adhesive installation, continuous demand and stable average durations. This is a throughput estimate, not a guarantee of feasible appointment slots.
+
+Notice how increasing the number of stylists does not necessarily increase the number of clients the salon can handle.
+
+If the gluing station or natural hair preparation station is the bottleneck, adding more stylists may simply result in more idle stylists.
+
+The document correctly identifies this issue, including the risk of counting multi-skilled staff twice (source: lines 71–89).
+
+How I would calculate appointment availability
+
+I would use the following scheduling configuration initially:
+
+Configuration | Proposed setting
+
+Internal scheduling intervals | 5 minutes
+
+Client-facing booking intervals | 30 minutes
+
+Scheduling method | Complete service route insertion
+
+Staff allocation | Pooled by qualification
+
+Named stylist allocation | Specific reservation
+
+Recovery capacity | Initially pilot 15%
+
+Recalculation | Whenever a significant operational event occurs
+
+
+
+This means that clients could still choose convenient times such as 10:00, 10:30 or 11:00 AM without being restricted to one-hour service durations.
+
+The engine would attempt to fit the complete service route into the existing schedule before making that appointment available.
+
+5. The production pipeline approach
+
+I would borrow certain principles from production line management.
+
+Think of the salon as having several interconnected workstations, each with its own capacity, queue and processing time.
+
+The objective is to maintain a continuous supply of clients who are ready for the next stage, without allowing excessive queues to accumulate.
+
+Consider this illustrative schedule involving four clients.
+
+Client | Hair prep | Gluing | Setting | Styling
+
+A | 9:00–9:40 | 9:40–9:55 | 9:55–10:10 | 10:10–10:40
+
+B | — | 9:00–9:15 | 9:15–9:30 | 9:30–10:00
+
+C | — | 9:15–9:30 | 9:30–9:45 | 10:00–11:00
+
+D | 9:40–10:20 | 10:20–10:35 | 10:35–10:50 | 10:50–11:20
+
+
+
+Illustrative parallel service journeys. Assumes at least two stylists and sufficient station capacity.
+
+In this example, Client B arrives at the same time as Client A but completes their service earlier because they do not require natural hair preparation.
+
+This is perfectly acceptable. The system should not attempt to make all clients progress at the same speed simply because they arrived at the same time.
+
+The ready-client buffer
+
+One addition I would make to the document is a controlled ready-client buffer for styling.
+
+The gluing station should prepare enough clients to keep the stylists working continuously, but not so many that clients remain seated for unnecessarily long periods after gluing.
+
+Styling queue condition | System response
+
+No clients ready or approaching readiness | Alert upstream stations
+
+Sufficient clients approaching readiness | Maintain normal flow
+
+Several clients ready but waiting | Slow upstream releases
+
+Excessive post-setting waiting | Escalate to reception or manager
+
+All stylists occupied for extended periods | Delay new gluing starts where appropriate
+
+
+
+Rather than establishing a fixed number of waiting clients, the system should look at when stylists are expected to become available.
+
+For example, if three stylists are expected to finish within the next 30 minutes, the system should try to ensure that three suitable clients are progressing towards styling readiness.
+
+This develops your existing 30-minute gluing rule into a proactive scheduling mechanism.
+
+The original document already establishes the necessary safety constraint: gluing should begin at least 30 minutes before styling, and actual readiness must be confirmed (source: lines 116–143).
+
+6. How the queue should actually work
+
+I would avoid a single physical queue where clients are simply numbered from 1 to 30.
+
+Instead, every client should have one permanent ticket for their visit, with their position in each operational queue determined dynamically.
+
+A client might have ticket A014, but their operational status changes as they progress through the salon.
+
+Ticket A014 — In service | Full frontal installation + natural hair preparation
+
+Checked in | 10:00 AM
+
+Washing and blow-drying | Completed at 10:20 AM
+
+Plaiting | Completed at 10:40 AM
+
+Gluing | 10:40–10:55 AM
+
+Adhesive setting | Awaiting readiness confirmation
+
+Styling | Expected start: 11:10–11:20 AM
+
+Checkout | Pending
+
+
+
+The ticket number identifies the client. It does not necessarily determine their priority at every station.
+
+Queue prioritization rules
+
+I would implement a hierarchical decision process rather than a complicated points-based priority algorithm initially.
+
+Technician becomes available → Identify eligible clients (ready, qualified, no conflicts) → Protect due commitments (confirmed appointment reservations) → Check excessive waiting (escalate clients nearing wait limits) → Rank comparable clients (longest ready time, then arrival) → Recommend next client (record assignment and reason).
+
+Importantly, excessive waiting should not automatically override another confirmed appointment. It should trigger an intervention or a search for alternative capacity.
+
+This is consistent with the document's proposed eligibility-first queue policy (source: lines 146–181).
+
+7. Resolving the conflict between walk-ins and appointments
+
+I think this is where the business needs to change its operational policy, not just its software.
+
+A walk-in client should not be admitted into an indefinite waiting queue.
+
+When they arrive, the system should calculate the earliest feasible service journey, taking existing bookings into consideration.
+
+For example:
+
+Client | Arrival | Booking | Estimated first service
+
+A | 10:00 | Walk-in | 10:40
+
+B | 10:05 | Walk-in | 11:00
+
+C | 10:25 | 10:30 appointment | 10:30
+
+D | 10:35 | Walk-in | 11:20
+
+
+
+Client A should be informed at 10:00 that their estimated service start is 10:40, rather than being told that they are next.
+
+When Client C arrives, their reserved appointment is already factored into Client A's estimated waiting time.
+
+This changes the conversation from “Why is that client being served before me?” to an expectation that was communicated when the walk-in arrived.
+
+Walk-in admission policy
+
+I would initially pilot the following thresholds:
+
+Estimated wait to first service | Reception action
+
+0–15 minutes | Accept normally
+
+15–30 minutes | Communicate estimated wait
+
+30–60 minutes | Confirm willingness to wait
+
+60–90 minutes | Recommend a later return time
+
+Over 90 minutes | Avoid adding to the physical waiting queue; offer a later reservation
+
+
+
+These are proposed policies, not existing business rules.
+
+The important distinction is that the system can offer a client a later return time without requiring them to sit in the salon for an hour.
+
+This effectively creates a virtual waiting room.
+
+I would also avoid a permanent 70/30 split between bookings and walk-ins at this stage. The document rightly notes that there is insufficient demand data to justify a fixed ratio. Once we collect enough data, we can determine whether certain hours need reserved walk-in capacity.
+
+8. What the reception dashboard should look like
+
+Reception should have one operational dashboard rather than having to switch between separate booking, sales and technician allocation screens.
+
+The following is an illustrative prototype of the live dashboard.
+
+Salon live operations — Example branch, 11:20 AM, simulated data
+
+Clients in salon: 18 | Waiting clients: 6 | Appointments due: 3 | Available stylists: 1
+
+Station occupancy | Occupied / total
+
+Hair preparation | 2/2
+
+Gluing | 1/2
+
+Setting | 3/3
+
+Styling | 4/5
+
+
+
+Setting station at capacity: Check styling readiness before releasing more clients from gluing.
+
+Ticket / type | Stage | Time | Status / reason
+
+A021 Appointment | Styling | 12 min | Ready — Appointment due
+
+A018 Walk-in | Styling | 24 min | Ready — Longest ready wait
+
+A022 Appointment | Setting | 8 min | In progress — Awaiting readiness
+
+A023 Walk-in | Prep | 15 min | Waiting — Next prep technician
+
+A024 Appointment | Gluing | 5 min | Ready — Styling target approaching
+
+A025 Walk-in | Prep | 0 min | In progress — Washing
+
+
+
+Client flow filters: All, Prep, Glue, Style. Next recommended styling assignment: Client A021. Ready for styling, with a due appointment commitment.
+
+The dashboard should also display upcoming appointment risks, estimated capacity for new bookings and any staff shortages.
+
+The receptionist should primarily deal with exceptions. Routine coordination should be handled by the system.
+
+9. What the technician's interface should look like
+
+One concern I have with implementing this system is the amount of interaction required from technicians.
+
+If we ask staff to constantly update their phones, select clients, enter durations and navigate complicated screens, the system will quickly become a burden.
+
+I would keep their interface extremely simple.
+
+Stylist workstation — workflow demonstration
+
+Available → Your next recommended client: A021. Standard frontal styling. Estimated duration: 30 minutes. Natural hair preparation complete. Gluing complete and ready.
+
+Start service → Busy / Current client → Complete service → Available / Service completed.
+
+In the live system, the performer and completion time would be recorded and the next assignment calculated.
+
+Ideally, for a normal service stage, a technician should only need two actions:
+
+Start service → Complete service
+
+For exceptional situations, there can be additional actions such as reporting a delay, requesting assistance or indicating that the client is not ready.
+
+The same completion event should feed staff performance reporting, service history, complaint handling and bonus calculations. We should not require staff to record their work again in a separate system.
+
+10. Handling service overruns
+
+This is where a dynamic system becomes significantly better than fixed appointment slots.
+
+Suppose Stylist A begins styling at 11:00 AM, with an estimated completion time of 11:30 AM.
+
+At 11:25 AM, they realize that they need another 25 minutes.
+
+The system should receive a remaining-time update and respond accordingly.
+
+Before overrun | After overrun
+
+Stylist available at 11:30 | Stylist available at approximately 11:50
+
+Next client expected at 11:30 | Next client at risk of delay
+
+Gluing planned for 11:00 | Review affected upstream work
+
+Subsequent booking plan feasible | Recalculate feasibility
+
+
+
+The system should first attempt to allocate the affected client to another qualified stylist.
+
+If that is not possible, it should adjust the estimated service time and alert reception.
+
+It should not automatically delay every client by 20 minutes. Some clients may be unaffected because other staff or stations are available.
+
+I agree with the document's recommendation to retain the original appointment promise separately from the revised estimate. Otherwise, we would never accurately measure how often we are running behind schedule (source: lines 209–233).
+
+11. Preferred stylist bookings
+
+Since you would prefer to discourage clients from booking particular stylists, I would introduce a distinction between a stylist preference and a guaranteed stylist reservation.
+
+Feature | Standard booking | Stylist preference | Guaranteed stylist
+
+Specific stylist guaranteed | No | No | Yes
+
+Pooled capacity | Yes | Yes | Limited
+
+Automatic reassignment | Yes | Yes, under disclosed terms | Requires consent
+
+Booking availability | Broadest | Broad | Restricted
+
+Potential waiting time | Lower | Variable | Potentially higher
+
+
+
+The default booking interface should not immediately ask the client to select a stylist.
+
+Instead, the client should select their branch, service and preferred time.
+
+A specific stylist request can be an additional option.
+
+This allows you to gradually move towards a business model where clients trust the salon's service standards rather than depending on one individual technician.
+
+I would not introduce an additional preferred-stylist fee without first assessing client reactions and the operational cost of such requests.
+
+12. The scheduling engine's decision-making logic
+
+For the developers, I would define two distinct scheduling functions.
+
+A. Future booking planner
+
+Responsible for determining whether a new appointment can be accepted.
+
+1. Identify the selected branch and service.
+
+2. Generate the required service stages.
+
+3. Estimate the duration of each stage.
+
+4. Identify qualified staff and stations.
+
+5. Load existing reservations and shifts.
+
+6. Find a feasible sequence of service stages.
+
+7. Check dependencies and required buffers.
+
+8. Return available appointment options.
+
+9. Recheck and reserve capacity on confirmation.
+
+B. Live dispatch engine
+
+Responsible for coordinating clients already in the salon.
+
+1. Identify available technicians.
+
+2. Identify clients ready for their next stage.
+
+3. Filter by skills, stations and dependencies.
+
+4. Check protected appointment commitments.
+
+5. Evaluate waiting-time escalation.
+
+6. Check downstream capacity.
+
+7. Recommend the next eligible client.
+
+8. Record assignment and actual start.
+
+9. Recalculate after service completion.
+
+These functions should share the same underlying capacity model.
+
+Otherwise, we risk having a booking engine promising appointments that the live dispatch engine cannot fulfil.
+
+I would use a rolling scheduling horizon: the system maintains a plan for the remaining operating day but primarily adjusts unstarted work affected by changes. Work already underway remains stable.
+
+13. What I would add to the existing document
+
+The current document is comprehensive, but I would explicitly develop the following areas before implementation.
+
+Area | Proposed development
+
+Service templates | Define actual stage durations for each installation variant
+
+Admission control | Define when to accept or stop accepting walk-ins
+
+Downstream readiness | Introduce controlled ready-client buffers
+
+Scheduling horizon | Establish when and how future assignments are recalculated
+
+Service complexity | Introduce standard, complex and extended duration categories
+
+Queue fairness | Approve specific waiting thresholds and escalation rules
+
+Staff allocation | Define scarce-skill protection and workload distribution
+
+Client communication | Define what an appointment actually promises
+
+Physical resources | Establish station and equipment capacity by branch
+
+Operational resilience | Define manual fallback when the system or internet fails
+
+
+
+The document proposes Google Sheets and Apps Script for the first controlled release. That may be adequate for a pilot, but I would treat the underlying technology as a decision requiring load testing rather than a permanent architectural commitment.
+
+Multiple staff simultaneously completing services, accepting assignments and creating bookings requires reliable concurrency control. The document acknowledges these risks, but no implementation or load testing has yet been performed (source: lines 418–438).
+
+14. How we should introduce the system
+
+I would not activate automated booking, automated staff allocation and public self-booking simultaneously.
+
+01 — Operational data collection
+
+Suggested duration: 2 weeks. Register all clients, record service stages, staff assignments and actual start and completion times.
+
+02 — Digital stage queues
+
+Suggested duration: 1–2 weeks. Introduce client tickets, readiness tracking and station queues. Reception retains assignment control.
+
+03 — Capacity-backed assisted bookings
+
+Suggested duration: 2 weeks. Allow reception to create bookings using system-calculated availability. Compare estimates with actual performance.
+
+04 — Guided and automated dispatch
+
+Introduce next-client recommendations, then automate routine assignments once the rules prove reliable.
+
+05 — Public self-booking
+
+Enable clients to book directly, using verified branch capacity and approved booking policies.
+
+The proposed durations are operational pilot periods, not software development estimates. Progression should depend on successful validation rather than simply the passage of time.
+
+15. Let's establish the operational parameters
+
+Before developing the architecture further, I would like us to simulate an actual working day using one branch's staffing configuration.
+
+Branch operational configuration
+
+Fill in what you know. Approximate figures are fine for an initial simulation.
+
+Field | Response
+
+Branch (Nairobi / Mombasa / Other) | 
+
+First shift (e.g. 9 AM–6 PM) | 
+
+Second shift (e.g. 3 PM–midnight) | 
+
+Natural hair preparation staff at peak | 
+
+Gluing technicians at peak | 
+
+Stylists at peak | 
+
+Multi-skilled staff included above | 
+
+Washing duration (min) | 
+
+Blow-drying duration (min) | 
+
+Plaiting duration (min) | 
+
+Gluing hands-on duration (min) | 
+
+Standard styling duration (min) | 
+
+Physical stations and equipment (shampoo stations, gluing chairs, setting seats, styling stations) | 
+
+Average installation clients per day (normal and busy) | 
+
+Advance booking proportion (less than 25%, 25–50%, 50–75%, more than 75%, unknown) | 
+
+
+
+Develop a detailed hybrid capacity and stage queue scheduling simulation using these branch details. Identify assumptions, bottlenecks, feasible booking intervals, walk-in policy and recommended operational rules.
+
+Overall recommendation
+
+I would proceed with the hybrid approach, but I would name the operational component the Client Flow and Capacity Management Engine.
+
+The fundamental principle should be:
+
+Reserve capacity in advance, assign staff dynamically, coordinate service stages proactively and manage clients according to both readiness and fairness.
+
+Rather than maximizing the number of appointments we accept, the system should maximize the number of clients we successfully serve within a reasonable amount of time and at the expected quality standard.
+
+The next step is to establish your actual staffing, station capacity and service durations. Until we have those figures, the numerical examples, waiting thresholds, recovery buffers and scheduling intervals above should remain provisional design recommendations rather than hard-coded business rules.
+
+Source referenced throughout: Salon Operations V2 — Appointment, Queue & Scheduling Design, 25 November 2026. Interactive chat demonstrations have been converted to static examples and editable tables for Word.

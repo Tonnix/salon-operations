@@ -1,0 +1,327 @@
+Nairobi & Mombasa Salon Operations
+
+Google Drive implementation roadmap | 25 November 2026 | Proposed design
+
+Purpose: extend the inventory app into a shared system for products, services, bookings, payments and staff work confirmation. The admin works in Google Sheets on Drive. Staff use simple forms on branch tablets. Stylists use their phones to review and confirm their own work, with client names permitted and client contacts withheld. “Tabs” is interpreted here as tablets and task-specific app screens.
+
+This roadmap records the target design and release gates. It does not change the live workbook, deploy a new app, approve products or migrate financial records. Features described below are planned unless identified as existing.
+
+1. Recommended setup
+
+Use one central operations system for both branches, with separate Nairobi and Mombasa entry screens. Keep one shared product catalogue and service catalogue. Every order, stock event, booking and staff assignment carries a branch identifier. Product identity and SKU do not change because stock changes branch.
+
+Use Google Sheets as the admin-facing data store for the first controlled release, with an Apps Script web app as the staff interface. The branch screens use the same backend and business rules. A link can open the appropriate branch screen, but the server determines whether the signed-in staff member is allowed to use that branch.
+
+Do not give ordinary staff access to the underlying spreadsheets. Separate branch workbooks are unnecessary for day-to-day staff work once the app provides correctly restricted views. The admin can see both branches and consolidated reports. Branch managers see only authorised branches.
+
+Maintain a separate private client-contact workbook, linked by Client ID, and a central operations workbook containing operational records and display names. Both remain admin controlled. Reception retrieves contact information through authorised app endpoints; stylists cannot. This separation reduces accidental exposure but does not replace server permission checks.
+
+A Google Drive folder should contain the roadmap, operations workbook, restricted contact workbook, owner-only script source and release notes, approved staff guides, private backups and a read-only legacy archive. Staff receive the app link, not the folder or workbook link. Keep test files and fictional test data separate from production.
+
+Treat Sheets and Apps Script as a measured first stage. Test the expected concurrent users and record volumes before launch. If processing times, quotas, recovery needs or reporting complexity become unsuitable, retain the screens and identifiers while moving the transactional backend to a database. Do not promise unlimited growth from a spreadsheet.
+
+2. What carries forward and what changes
+
+Reuse the standard product definitions, readable SKU conventions, approval workflow, product picker and movement rules already developed. Keep the wig catalogue’s familiar attribute-entry layout. Wigs and other products may have different catalogue editing views, while the transaction picker searches all approved sellable products together.
+
+An internal Product ID remains permanent. Before approval, the suggested SKU is generated from product fields. On approval, the SKU is stored and frozen; later attribute or price changes do not change it. Named colours remain readable. Retail prices appear in the picker, not in the permanent SKU. Material, texture and construction abbreviations follow the approved catalogue rules.
+
+Do not import completed historic sales. At cutover, bring in verified branch stock and any open obligations: future bookings, deposits, unpaid bills, customer credits, refunds due, unfinished services and client-owned wigs still in the shop. Preserve the old workbook as a read-only reference.
+
+Replace the 52-week transaction layout with continuous records and date filters. Provide Today, Yesterday, This week, Custom period and branch filters. Weekly reports remain available without requiring weekly entry tabs or a fixed one-year date range.
+
+The existing inventory app is a starting point. Its single-product movement form is not yet an order basket, split-payment ledger, service delivery record or booking system. Those need explicit implementation and testing. The currently deployed app has not been independently verified end to end for this roadmap.
+
+3. Screens staff will use
+
+Reception and sales on tablets
+
+After login, show the staff member’s permitted branch and duties. The home screen has Today, New visit/order, Bookings, Payments, Stock and Exceptions as permitted. Show large controls, short labels and the minimum fields for the selected action. Hide irrelevant transfer, payment and service fields.
+
+A new visit can contain products, hair services and lash services in one order. Search products by readable name, colour, length, texture or SKU, with price and branch availability visible. Services show their inclusions. The cashier reviews the basket, promotions, deposit already received, amount paid and balance due before collecting money.
+
+Hair and lash reception should be able to work on the same authorised client order instead of independently charging the same client twice. Record who booked, sold, recorded, collected payment and performed the work as different responsibilities.
+
+Booking agents
+
+Social-media staff, the official-phone holder and authorised reception staff can create or amend bookings within their permissions. Capture client name, contact, branch, intended service, preferred time, booking source and deposit status. Booking agents do not automatically receive stock adjustments, refunds, exports or access to every client.
+
+A booking is planned work; a visit is actual attendance. Support rescheduling, cancellation and no-show without inventing a completed service. Do not implement automatic deposit forfeiture until the cancellation policy is approved.
+
+Service delivery and lash walk-ins
+
+Reception assigns work to eligible staff. Record service stages and actual performers separately from the bill. A stylist may carry out several tasks in one service, and different staff may perform washing, plaiting and installation. Included stages are tracked without charging them again.
+
+Lashes remain walk-in initially. A hair booking can note interest in lashes, but that does not guarantee a reserved lash slot. Show a branch queue and realistic waiting status. Use 30 minutes for clusters and approximately 90 minutes for individual lashes as initial planning values, subject to operational confirmation.
+
+Manager and admin
+
+Managers handle authorised branch exceptions: discounts outside rules, price overrides, transfers, stock adjustments, complaints, refunds, staff disputes and period closure. The admin manages catalogue approval, branch settings, permissions and consolidated reporting in Sheets. Routine corrections should use validated admin actions instead of editing posted ledger rows directly.
+
+4. Phone-based confirmation of staff work
+
+Give each stylist a personal My work screen. It shows only their assigned or recorded work in an authorised branch and selected period. Permitted fields are client display name, work ticket, service or stage, date, branch and confirmation status. Exclude phone numbers, email addresses, payment references, client contact notes and raw customer records.
+
+Record the work during the visit through reception or an authorised service workflow. At period end, present the stylist with a proposed list to acknowledge. The review period should be configurable as daily, weekly or another approved period; choose the operational default before pilot.
+
+Awaiting confirmation: the staff member reviews each task or a clearly summarised list.
+
+Confirmed: they acknowledge work they performed; store the confirmer, timestamp and version of the reviewed list.
+
+Disputed or missing work: they flag “not my work”, an incorrect stage or missing work for a manager. This creates a review request rather than rewriting financial or stock records.
+
+Manager reviewed and locked: resolve disputes and close the period. A later correction requires an audited reopening or adjustment that preserves the original confirmation.
+
+Confirmation is an acknowledgement, not another sale. It must never post stock, receive money, duplicate revenue or complete a second task. An unconfirmed list is not silently accepted. Staff cannot self-award services, change prices or confirm somebody else’s work by changing an identifier.
+
+Included, free promotional and corrective tasks remain visible and tagged. Capture the facts needed for future performance or bonus calculations, but do not invent bonus rates or infer that every recorded task earns commission. Lock bonus policy and its effective dates separately from task confirmation.
+
+Keep client names short where practical. Do not expose contact information through task notes, exports, search suggestions, URLs, browser storage or network responses. Merely hiding a contact field on screen is insufficient. A server response for a stylist must contain only the permitted fields.
+
+5. Core records and identifiers
+
+Create structured tables with one type of record per table. Use permanent internal IDs and relationships instead of spreadsheet row numbers. A readable daily reference can help staff, but it is not a provider payment receipt and is not the only unique identifier.
+
+Branches and staff: branch membership, roles, service skills, account status and effective permissions.
+
+Catalogue: global products, approved SKU, attributes, unit of measure, service definitions, package components, branch prices and effective dates.
+
+Clients and contacts: Client ID and display name in operations; contact details in the private contact store. Client-owned wigs have separate intake records and are not retail stock.
+
+Bookings and visits: planned appointments, actual attendance, queue status, promised pickup and client-owned item custody.
+
+Orders and lines: one order for goods and services, price snapshots, quantities, discounts, branch and Hair/Lashes business-unit attribution.
+
+Work tasks and assignments: included stages, actual performers, completion evidence, source order line and corrective-work links.
+
+Payments and applications: each actual receipt once, its method and provider reference, and allocation to orders. Deposits are receipts applied later, not a second receipt at checkout.
+
+Credits and refunds: bill adjustments, overpayments, approved refund amounts and completed refund references as distinct records.
+
+Stock events and transfers: opening stock, replenishment, fulfilment, returns, training, marketing, service use, adjustments, dispatch and receipt.
+
+Controls: promotion rules, complaints, staff confirmations, period locks, audit events, submission keys, posting status and recovery exceptions.
+
+Store money in integer minor units and apply explicit rounding rules. Use Africa/Nairobi for operational dates and timestamps. Snapshot names, prices, inclusions and policy versions at the time of the order so future catalogue changes do not rewrite history. Keep client count, visit count and task count separate; do not add individual staff’s unique-client counts to obtain the salon’s unique-client total.
+
+6. Stock and interbranch transfers
+
+Track sellable stock by Product ID and Branch ID. Opening stock is a dated, signed-off event for each branch, with unknown or disputed quantities held for review. Replenishments add stock, sales fulfilments remove it, and other movement types retain distinct reasons. A customer return affects sellable stock only after its condition and disposition are confirmed.
+
+Do not double-post stock when an order is saved, paid and fulfilled. Define one fulfilment event as the stock-posting point, with reservations tracked separately where needed. A customer-owned wig cannot enter sellable inventory. Services do not have stock balances.
+
+Use a transfer record with one shared Transfer ID and states Draft, Dispatched, Part received, Received, Disputed and Cancelled as applicable. Dispatch reduces source sellable stock and creates stock in transit. Destination sellable stock increases only for quantities actually accepted. A mismatch stays open for review. Repeated confirmation cannot add stock twice.
+
+The sending branch records dispatch; an authorised receiving staff member records receipt. Scope each action to their branch. Do not allow a Nairobi-only user to confirm Mombasa receipt. Dispatch cancellation or reversal requires explicit manager rules, especially if part has already been received.
+
+Training use, marketing issues and salon service consumption are separate movement reasons. Initially issue supplies in approved whole units or packs; fractional consumption requires a defined conversion and a measurement process. Reconcile legacy bundle counts before converting them: one three-bundle retail pack is one sale unit, and previous quantities cannot automatically be treated as packs.
+
+7. Orders, payments, promotions and corrections
+
+Receipts and split payments
+
+Rename the internal reference Stock movement ID or Order reference as appropriate. Label external receipts Full payment reference. Keep Pochi, M-Pesa Paybill, M-Pesa Till/Buy Goods, Cash and future PDQ as separate methods, with the receiving account or till configured where relevant.
+
+Support several receipts on one order and one receipt applied across the relevant lines or orders under controlled rules. One shared payment reference must not create new money every time another item is added. A provider settlement or alternative bank reference for the same money is linked to the original receipt, not counted again.
+
+Show Total, Confirmed payments, Deposit applied, Balance due and any Unapplied credit. Keep payment confirmation separate from later bank or M-Pesa reconciliation. Cash has an internal receipt reference; provider payments retain their full external reference rather than a short suffix assumed to be unique.
+
+Example: an order totals KES 2,500 and has a KES 500 deposit. Checkout should request KES 2,000. If a further KES 2,500 is actually collected, record total receipts of KES 3,000 and an overpayment of KES 500. Refund that excess with approval and a refund reference. The sale remains KES 2,500; this excess-payment refund does not itself require reducing the bill.
+
+Packages and launch offers
+
+Bill products and services separately when they are separate charges, while tracking their related work under the same order. For frontal installation, the agreed base is KES 2,000 for the 12-inch frontal, KES 1,500 for one pack of three bundles and KES 2,000 labour: total KES 5,500. Optional natural-hair washing, blow-drying and plaiting add KES 500, making KES 6,000.
+
+For branch-launch offers, default to one free cluster application per eligible hair-installation visit. Define eligible installation services, branches, campaign start/end dates and any exceptions explicitly. Individual lashes, removal and accessories remain chargeable unless an authorised exception says otherwise. Record the normal KES 800 cluster value, the promotion reduction, chosen style, technician and completed work.
+
+Agree management reporting allocation for combined Hair/Lashes offers before launch. Where an approved shared-discount rule uses proportional standalone prices, Hair KES 1,000 plus Lashes KES 800 with a KES 300 shared discount allocates KES 833.33 and KES 666.67. Keep exact rounding and policy versions. Customer-facing “free lashes” and business-unit revenue allocation are separate decisions; obtain accountant sign-off on financial reporting.
+
+Returns, complaints and corrective work
+
+A physical return, a bill reduction and a money refund are separate events. An unopened sellable return may restore stock; a damaged return may not. A price adjustment does not automatically restore stock. A refund requires an authorised payment event and reconciliation.
+
+Link complaints to the original work and staff, record findings and authorisation, and create a linked corrective task. A free redo creates work and may consume supplies without creating a new customer charge. Do not automatically deduct staff pay or attribute fault from a complaint entry alone.
+
+8. Catalogue and service prices to configure
+
+The following prices are configuration inputs supplied during planning, all in KES. Preserve scope and units. Confirm the remaining inclusions and variants before publishing service definitions.
+
+Natural hair and wig maintenance
+
+Natural-hair washing 200; blow-drying 100; plaiting, lines or cornrows 200. Combined preparation is 500.
+
+Standalone straightening/flat-ironing 500; curling/tonging 1,000. These are chargeable when separately requested outside a revamp, including during an installation.
+
+Revamp: blend/semi-human 1,000 and human hair 1,500, carried forward from the earlier service plan. Includes wig washing and the selected straightening or curling finish; do not charge that included finish again. Styling-only 300 is also carried forward and should be checked before catalogue release.
+
+Hair installations
+
+Wig installation, full frontal 1,000; closure 800. Glue adhesive and standard styling are included.
+
+Glueless wig installation, full frontal 800; closure 800. Define the permitted holding products and included standard styling.
+
+Frontal installation labour 2,000, with the frontal and bundle pack charged separately as described above.
+
+Bridal installation 3,000; client supplies their bun. Record it as a client-owned item.
+
+360 installation without bridal 2,000; with bridal 3,000 total. Usually uses glue. Confirm material inclusions before release.
+
+Frontal sew-in 2,500; confirm material inclusions. Double-frontal installation 4,000 was in the earlier plan and needs confirmation of scope and material quantities before activation.
+
+Lashes and related goods
+
+Clusters 800: Cat eye, Classic, Hybrid, Volume and Mega volume style options. These are service choices, not retail-stock SKUs.
+
+Classic individual lashes 1,500; Soft hybrid individual 2,500; lash removal 200. Distinguish Classic clusters from Classic individuals in the picker.
+
+Lash glitters, spikes and gems 20 each; specify each stock variant and unit.
+
+12-inch frontal 2,000 each; three-bundle pack 1,500 per pack; wig band 150 each; Hawaiian Silky 1,300 per retail unit. Confirm exact product size/variant rather than inventing it.
+
+Duration is a separate editable field, not a formula derived permanently from price. Use the suggested hair estimate of roughly one hour per KES 1,000 only as an initial planning aid; validate actual duration, preparation, shared staff and station capacity before offering automatic booking availability.
+
+9. Security, reliability and release controls
+
+The privacy boundary is the app server and Drive sharing. Google states that sheet/range protection is not a security measure; hidden tabs and filter views must not be used to protect client contacts. Protect formulas against accidental editing, but keep staff outside the underlying spreadsheets entirely.
+
+Use individual identities, branch-scoped permissions and server-side checks for every read and write. No shared admin account. Select and test authentication during the foundation phase: Apps Script active-user email can be unavailable in some deployments, including execute-as-owner scenarios. Do not silently identify every visitor as the owner or trust a branch/role passed by the browser. If app logins are retained, review credential storage, login throttling, session expiry and revocation before launch.
+
+A branch bookmark selects a preferred screen only. The server validates the user’s allowed branch, action and record ownership each time. A disabled user or changed role must lose access promptly. Restrict source-code editing, triggers and backups to the owner and explicitly authorised maintainers.
+
+Use one controlled posting service with a submission key, server-side validation, concurrency control and an audit trail. Where changes belong in one operations workbook, use a suitable Sheets API batch to apply related changes together. Atomicity within a supported batch is not a transaction across multiple workbooks, APIs or payment providers. Cross-resource actions need explicit posting states and recovery rules.
+
+On network loss, show that the form cannot submit and ask staff to reconnect or tether. Do not claim an offline entry was saved. For an uncertain timeout, check the submission key before retrying. Avoid storing client contacts on shared tablets. End-of-shift sign-out, device locks and short sessions are required operational practices.
+
+Use a separate test deployment and fictional clients for regression tests. Include an app version label. Saved script changes do not automatically update a versioned /exec deployment; the release procedure must select a new version, deploy it and verify it. Keep the previous known-good version and a tested rollback procedure.
+
+Create private dated backups and test restoration before launch. Recovery must reconcile any valid transactions entered after a backup; blindly restoring yesterday’s file can lose money or duplicate stock. Treat Drive version history as useful evidence, not a complete recovery plan. Record retention and contact-access review are owner decisions before rollout.
+
+10. Phased delivery and acceptance gates
+
+Sequence the work by acceptance gates rather than committing to dates before data and access are verified. The admin is the business owner; an implementer builds and tests; branch leads validate workflows; an accountant validates money and business-unit reporting.
+
+Phase 0 — Confirm operating rules
+
+Deliver: agreed roles by person and branch; service/package definitions; stock units; transfer permissions; payment accounts; cancellation and refund policy; campaign scope; confirmation period; open-deposit and credit migration rules. Confirm which unresolved items can remain inactive. Exit: admin approves the decision register and no ambiguous unit or price is activated.
+
+Phase 1 — Build the shared data and access foundation
+
+Deliver: private Drive structure, test and production separation, central operations tables, restricted contacts, stable IDs, authentication, branch-scoped permissions, audit and backup/restore process. Exit: test users see only permitted records; stylist responses contain no contacts; unauthorised direct requests fail. No live money is processed yet.
+
+Phase 2 — Catalogue, opening stock and transfers
+
+Deliver: familiar catalogue entry, approval and frozen SKU workflow, unified product picker, verified opening stock for each branch, stock events and in-transit transfer lifecycle. Exit: branch leads reconcile counts; pack units are correct; duplicate and concurrent submissions cannot double-post or oversell the last unit.
+
+Phase 3 — Orders and money
+
+Deliver: mixed product/service basket, price snapshots, deposits, split receipts, payment applications, discounts, refunds, credits and cash reconciliation. Exit: deposit, overpayment, shared-payment and reversal examples balance; accountant agrees report definitions. Every money event has an actor, status and audit link.
+
+Phase 4 — Bookings, service delivery and lash queue
+
+Deliver: booking-agent screens, visits, client-owned item intake, task stages, staff assignment, walk-in lash queue and configured offers. Exit: a combined visit can progress from booking through work to payment without duplicate charges, missing performers or inventory changes for client-owned items.
+
+Phase 5 — Stylist phone review and manager closure
+
+Deliver: My work list, confirmation/dispute flow, period versions, manager review and lock/reopen controls. Exit: stylists can confirm their own work on a real phone, cannot read contacts or colleagues’ records, and confirmation never changes financial or stock totals.
+
+Phase 6 — Reporting and reconciliation
+
+Deliver: admin dashboard by branch and business unit, money received versus billed activity, outstanding balances, deposits, refunds, stock, transfers, staff work and unresolved exceptions. Exit: drill-down records reconcile to totals; free/included/redo work is visible; distinct clients are not double-counted across staff.
+
+Phase 7 — Pilot, train and cut over
+
+Deliver: staff guides, short role-based training, trial shifts in Nairobi, fixes and a second-branch pilot in Mombasa. At the cutover boundary, freeze the old entry route, verify opening stock and open money obligations, and nominate the single live posting route. Exit: both branch leads and the admin sign off; staff use branch links; backup and support ownership are clear.
+
+Do not run two uncontrolled live ledgers in parallel. A pilot may compare outputs against a controlled check record, but only one route posts real stock and money. If rollback is required, stop new posting, preserve the audit and reconcile all pilot events before reopening the old route.
+
+11. Acceptance scenarios that must pass
+
+Privacy: a stylist can see their client’s display name and own task, but contacts are absent from HTML, network payloads, searches, exports and browser storage. Direct requests for another staff member or branch are denied.
+
+Roles: a booking agent cannot approve refunds or adjust stock; a combined operator at a small branch has only the explicitly assigned extra duties. Disabled accounts lose access.
+
+Catalogue: an unapproved product cannot be sold; approval freezes its SKU; later price/name changes do not rewrite past orders. Search supports the familiar product attributes.
+
+Pack units: one KES 1,500 three-bundle pack sale removes one pack. Legacy counts are reconciled before conversion.
+
+Installation: frontal 2,000 plus bundle pack 1,500 plus labour 2,000 totals 5,500; optional preparation totals another 500. Included stages do not duplicate the bill.
+
+Revamp and styling: the included selected finish is not charged twice; a separately requested finish outside revamp is charged correctly.
+
+Launch offer: an eligible visit gets one free cluster application, a technician task and an explicit discount; an ineligible individual-lash service remains chargeable.
+
+Deposit and split tender: total 2,500, prior deposit 500 and cash 500 plus Pochi 1,500 settle the order. A shared receipt across lines counts once.
+
+Overpayment: deposit 500 plus later collection 2,500 against a 2,500 bill produces a 500 excess and an approved refund without reducing the bill.
+
+Returns and redo: a money refund cannot silently add stock; a free corrective task links to original work, records performers and consumes supplies only when required.
+
+Bookings: reschedules and no-shows preserve deposit history without creating completed work. A client-owned wig never becomes sellable stock.
+
+Transfer: dispatch reduces source availability; destination increases only on accepted receipt. Partial receipt, discrepancy and repeated receipt confirmation behave correctly.
+
+Concurrency and recovery: two cashiers attempting the last unit cannot both fulfil it; a timeout/retry creates one order, one receipt and one stock event.
+
+Staff confirmation: confirmation/dispute/reopen actions retain history and do not alter sales or stock. Missing work requires manager review.
+
+Reporting: branch and consolidated totals reconcile; cash receipts, deposits, billed amounts and staff tasks remain distinct measures.
+
+Device and deployment: actual branch tablets and stylist phones have readable text, working search, responsive forms and correct version; loss of internet shows an unsaved/pending status rather than false success.
+
+12. Decisions to settle before production
+
+People and permissions: named staff, permitted branches, booking/sales/collection/transfer capabilities, managers and backup admin.
+
+Staff confirmation: daily, weekly or another period; deadline, manager reviewer and handling of late or disputed work.
+
+Promotions: launch branch, dates and eligible installation service IDs; default free service is clusters. Confirm any approved exceptions and Hair/Lashes allocation policy.
+
+Services: final durations, material inclusions for 360 and sew-in, double-frontal scope and any carried-forward maintenance prices before activation.
+
+Units and starting position: bundle-pack conversion, retail product variants, branch stock counts, current client-owned items, open deposits, debts, credits and refunds.
+
+Money policy: receiving accounts, who may verify receipts, who approves refunds/discounts, reconciliation responsibilities and cancellation/no-show terms.
+
+Performance: whether any bonus scheme is needed, its rates, eligible task types, shared-work rules and effective dates. No payroll automation until agreed.
+
+Operations: authentication approach tested with real accounts, devices, backup owner, support contact, contact-data retention and the expected peak user/transaction load.
+
+These decisions refine implementation; they do not reopen the accepted requirements of shared product identity, branch-specific stock, tablet-first staff forms, phone-based work confirmation, no client contacts for stylists, free clusters as the default launch offer and no completed historic-sales import.
+
+13. Technical references and existing admin resource
+
+Google’s protection guidance explains why protected ranges and hidden sheets cannot provide the staff privacy boundary. Google’s Session documentation explains the email-identity limitation that must be tested during authentication design. Google’s batch guidance supports grouping suitable operations, and its deployment guidance distinguishes saved source from a versioned live release.
+
+Protect, hide and edit sheets — Google Help
+
+Session identity — Google Apps Script
+
+Batch requests — Google Sheets API
+
+Create and manage deployments — Google Apps Script
+
+Existing Nairobi inventory workbook — admin reference
+
+The existing Nairobi workbook is a migration source and current admin resource. Do not treat it as the completed two-branch service platform. Verify its latest state and reconcile opening data before any production migration.
+
+Appendix — Role and access summary
+
+This matrix is the default permission design. Grant capabilities by person and branch, with audited exceptions for small-branch combined roles. “Permitted” means the app checks the action on the server; it does not imply access to the underlying Sheets.
+
+
+
+Role / device | Permitted work | Client information | Scope / restrictions
+
+Admin / desktop Sheets | Catalogue, settings, all reports and approvals | Contacts and full records as required | Both branches; controlled ledger corrections
+
+Branch manager / tablet | Branch exceptions, refunds, transfers, period review | Contacts needed for authorised cases | Assigned branches; no global permissions by default
+
+Reception / sales tablet | Visits, orders, assignments, collection and intake | Names and contacts for branch duties | Assigned branch; overrides need approval
+
+Booking agent / tablet or desktop | Create and amend authorised bookings; record deposit evidence | Contacts needed for booking | Scoped access; no refunds, stock adjustment or global export
+
+Lash reception / tablet | Lash queue and authorised shared orders | Names and contacts needed for duties | Assigned branch; do not duplicate Hair payments
+
+Stylist / personal phone | Own work list; confirm, dispute or request missing work | Display name only; no contacts | Own tasks and authorised branch; no financial edits
+
+Combined branch operator / tablet | Explicitly assigned booking, sales and delivery duties | Only information required by granted duties | Named permissions; not automatic manager access

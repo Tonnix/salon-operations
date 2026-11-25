@@ -1,0 +1,283 @@
+Appointment, Queue & Scheduling Design
+
+Salon Operations V2 | Nairobi and Mombasa | Design proposal, 25 November 2026
+
+Recommendation: use a hybrid, capacity-backed booking system with one shared client-flow record, coordinated queues for each service stage and flexible assignment of qualified staff. Retain convenient appointment choices for clients, but calculate availability from the actual service journey rather than one-hour boxes. Start with transparent scheduling rules and explainable suggestions; introduce more complex optimisation only if measured operational problems justify it.
+
+This is an evaluation and design document, not an implementation release. The new requirements are recorded in the fresh project. No operational workbook, live schedule, staff access or old app is changed. Proposed grace periods, buffers, queue weights and customer promises remain policy decisions until accepted.
+
+Existing project roadmap
+
+Agent build playbook
+
+1. What the client reserves
+
+A booking reserves branch capacity for an intended service journey, with a stated arrival/check-in time and an expected first hands-on start window. The detailed internal plan reserves the required preparation, installation and styling resources. A pooled booking does not promise one stylist for the entire visit.
+
+Avoid one ambiguous “appointment time”. Store and display arrival time, first-service start window and estimated finish separately. Where clients specifically care about styling time, show that target and the earlier preparation arrival requirement explicitly. For example: “Arrive at 09:30 for preparation; expected styling around 11:00; estimated finish 11:35–11:50.” These example times are illustrative, not approved service standards.
+
+Default to any suitably qualified technician. Capture a preferred stylist separately as either a soft preference or a confirmed named-stylist commitment. A soft preference may be accommodated without holding capacity indefinitely; a confirmed request reserves that person for specified stages and cannot be silently reassigned. Confirm this distinction and its wording before launch.
+
+Keep all three intake categories in the same system: pooled appointment, named-stylist appointment and walk-in. They share client, visit, order and task records, while retaining different reservation commitments. Walk-ins get a digital ticket and a capacity-based estimate; do not create a fictitious earlier appointment to make them fit.
+
+2. Alternatives and trade-offs
+
+Fixed one-hour appointments
+
+This is familiar and easy to explain, but one hour is not a capacity unit when jobs require different preparation, different skills and different stations. It can overbook the glue or prep station while leaving stylists waiting. Keep hourly choices only as a presentation option if the full resource plan behind each choice is feasible.
+
+A single first-come-first-served queue
+
+This makes arrival order easy to explain, but ignores booked commitments and clients who are not ready for the next stage. It can assign the wrong skills or reserve the wrong person. Arrival order should inform fairness among comparable eligible clients, not determine every stage assignment.
+
+Completely fixed staff and station schedules
+
+Scheduling every client against named staff far in advance gives precision but sacrifices pooling and creates many rescheduling tasks when a person is absent or a service overruns. Use hard named assignments only where necessary; retain capacity reservations for ordinary bookings and bind actual staff near execution.
+
+Recommended hybrid
+
+Reserve feasible capacity, coordinate stage queues and make assignments close to the time work is performed. This preserves commitments and flexibility, but requires reliable service templates, shifts and a few timely status updates. Start in recommendation mode so reception can see why a client is next. Automate routine offers after the rules are validated.
+
+3. Capacity: what makes a booking feasible
+
+Calculate availability by branch, date, service variant and required stages. Consider actual staff shifts, skill permissions, absences, breaks, equipment/station counts, setup/cleanup, existing reservations, work already underway and closing times. An empty stylist chair alone is insufficient if all qualified glue technicians or prep stations are occupied.
+
+Each hands-on stage needs a qualified staff member and the relevant station for its estimated occupied interval. A staff member cannot perform two hands-on tasks at once, even if qualified for both. Passive waiting may release staff but still occupies a setting chair or another resource. Model those intervals explicitly. Parallel tasks are allowed only if the client and safety rules permit them.
+
+For every candidate booking, construct a feasible sequence of intervals for all its required stages. Respect existing commitments. Use provisional internal staff allocations to prove pooled capacity is feasible; these are not necessarily named promises to clients. Counting the same multi-skilled person once in each skill pool would inflate capacity.
+
+Use a configurable internal time grid, for example five-minute increments, and client-facing arrival choices, for example every 15 or 30 minutes. These are design suggestions, not approved policies. The underlying durations may span several increments. A simplified first release can test candidate insertions with deterministic rules instead of finding a global optimum.
+
+At confirmation, recheck capacity server-side and reserve it under concurrency control. A screen showing availability is only a quote. Use expiring holds when confirmation or deposits take time; repeated clicks must not create two reservations. If money arrives after a hold expires, record the receipt and an exception for rebooking or refund rather than silently overbooking.
+
+Do not derive service duration from price. Store expected hands-on time, passive time, station occupancy and uncertainty separately by service/stage. Begin with observed or explicitly provisional estimates and learn from completed work. Use conservative scheduling buffers where justified, while tracking them separately so they are not mistaken for actual work.
+
+Opening hours and rostered capacity are different. The stated roughly 09:00–midnight operation and two shifts are planning context; configure each branch’s actual hours, last feasible start and safe completion rules. After 19:00, expose fewer or no slots when staff are absent, not merely because demand is usually lower. Holiday exceptions need approved hours and staffing, not an automatic overbooking switch.
+
+Store full local timestamps across midnight and a defined reporting business date. A 23:30 arrival and 00:30 finish must not appear as negative duration or as a booking outside an unexplained day. Do not schedule beyond a shift without an authorised extension or planned qualified handoff.
+
+The resource and dependency model follows established scheduling concepts: tasks have ordering constraints and resources cannot serve overlapping work. Google’s job-shop example illustrates those concepts; its manufacturing objective is not the salon’s complete policy. The proposed salon rules also protect fairness, client promises and service quality.
+
+4. Multi-stage services and the 30-minute gluing rule
+
+Represent each visit as a selected task graph, not one indivisible hour. A common path is check-in → wash → blow-dry → plait → glue application → setting → styling → quality check → checkout. Skip stages not required. Add wig preparation where needed and allow it to run separately only if it does not require the same client or staff resource at that time.
+
+Your requirement is that gluing starts at least 30 minutes before anticipated styling. Record this as a minimum start-to-start lead: planned styling start must be at least planned gluing start plus 30 minutes. Also require actual glue application and product-specific safe setting to be complete before styling. Thirty minutes is not automatically the glue technician’s hands-on duration or a safe setting time for every product.
+
+Illustrative plan for an 11:00 styling target: check-in 09:30; wash 09:40–09:50; blow-dry 09:50–10:00; plait 10:00–10:20; handoff/buffer 10:20–10:30; glue application 10:30–10:40; setting 10:40–11:00; styling 11:00–11:35. All stage durations here are assumptions for explaining the design and require validation.
+
+Backward-plan the required arrival from the styling target, then verify all resource intervals forward. If prep slips to 10:45, do not keep an impossible 11:00 styling promise. Calculate a new target, flag affected commitments and show reception the reason. Never reduce safe setting time to recover a delay.
+
+Avoid starting upstream preparation just to make the queue look shorter. Limit work in progress when downstream glue, setting or styling capacity is saturated. Only start gluing when a realistic downstream plan exists, with an agreed maximum acceptable wait after setting and comfort/safety review.
+
+A timer can indicate that a planned setting interval has elapsed; it cannot certify readiness. Require the authorised technician’s ready acknowledgement and prerequisite checks. A client already in another hands-on stage is not simultaneously eligible for styling.
+
+5. Fair queue policy
+
+Use one central client-flow record and virtual queues for prep, glue, styling and lashes. The client has one ticket with stage-specific readiness and waiting times. These queues must coordinate through the same task and reservation model, rather than independently allocating the same client or staff member.
+
+First filter for eligibility: arrived, prerequisite stages actually complete, required waiting time satisfied, service safe to proceed, suitable staff and station available, and no conflicting active stage. Respect confirmed named-stage reservations, staff shifts and authorised assignments. Only then rank the eligible candidates.
+
+Recommended ranking policy, for approval: protect due appointment commitments; prevent excessive waiting using a threshold-based escalation; among otherwise comparable candidates use oldest ready-since time, with arrival time as a tie-breaker. Preserve original arrival and waiting history when a new stage becomes ready; do not reset all fairness history or claim that elapsed prep was idle waiting.
+
+Before fitting a walk-in into a gap, test its buffered service path against upcoming commitments, including those whose clients have not arrived. A short, feasible gap job can proceed. A job likely to displace a protected booking cannot be accepted at that start merely because it arrived earlier.
+
+Do not hold a qualified stylist idle for an absent preferred-stylist client for an unlimited time. Use an agreed check-in lead and late/no-show grace policy. At expiry, release future capacity under policy while keeping the booking history, deposit and communication trail. Re-entry after lateness is based on the next feasible opportunity, not automatic queue-jumping or punishment.
+
+Prevent walk-in starvation with a visible maximum-wait escalation and admission limits. When a threshold is approached, reception offers a realistic later time, an alternative qualified stylist, another branch if acceptable, or the option not to wait. Do not repeatedly promise “soon” while accepting more bookings. A manager cannot fix inadequate capacity merely by changing a priority label.
+
+I do not recommend a permanent 70/30 or similar appointment/walk-in split yet. No demand or duration measurements support a specific ratio. Start by protecting confirmed commitments, preserving configurable recovery capacity and accepting walk-ins only when feasible. Use time-of-day evidence to pilot dynamic walk-in allowances or reserved windows later, then release unused holds at a defined cutoff.
+
+Named-stylist requests create a specific constraint, not universal superiority over every waiting client. Show the client the wait caused by the preference and offer a pooled alternative with consent. Deposit payment satisfies the booking’s financial terms; it does not buy an unlimited right to displace other confirmed clients.
+
+6. Staff allocation and automation
+
+When a stage is ready, suggest a qualified available technician and station that can complete it within the shift and without breaking commitments. Consider continuity where useful, workload fairness and scarce-skill protection: do not occupy the only qualified specialist with a generic task when a specialist task is imminently due and another technician can do the generic task.
+
+Offer the assignment, let the technician or authorised reception accept it, then record actual start. A short assignment offer can expire if not accepted, but expiry must never imply the service was performed. Simultaneous accept attempts must produce one owner. Preserve the original assignment, reassignment reason and actual performer.
+
+Use explainable labels such as “appointment due”, “ready longest”, “only available qualified technician” or “named-stylist commitment”. Managers may override soft priority with a reason and an impact preview. They cannot override missing skills, unsafe dependencies or overlapping active work simply by moving a queue card.
+
+Do not reassign work already underway automatically. For future unstarted stages, recompute feasible suggestions without unnecessary staff churn. A confirmed named-stylist commitment needs explicit consent to change. If only a proposed internal assignment changes, reception need not re-contact the client unless the client-facing promise changes.
+
+The scheduling engine should be deterministic and auditable. A language-model agent may help explain rules or analyse patterns, but should not independently invent durations, declare adhesive ready, send client messages or make unapproved booking promises. More advanced optimisation is a later tool, not a prerequisite for a useful first release.
+
+7. Responding to change
+
+Early completion: release actual occupied resources and recalculate eligible next work; do not mark downstream tasks complete automatically.
+
+Overrun: show overdue work and ask for a realistic remaining-time update. Recalculate downstream estimates and threatened promises. Never assume an overdue task has already ended because its scheduled finish passed.
+
+Additional service: add a versioned order line and task path, show extra price and time, obtain the client’s choice, and recheck capacity. Offer a later start or separate booking if it cannot fit; do not insert it by silently delaying everyone else.
+
+Late arrival: record actual arrival, evaluate remaining feasibility, apply approved grace terms and explain the revised estimate. Do not mark a checked-in client no-show through an old timer.
+
+Absence or break: remove affected future availability, surface impacted bookings and propose qualified alternatives. Do not count an absent technician as capacity because their usual roster exists.
+
+Staff near shift end: require a feasible completion or an agreed handoff. Ending a shift does not permit an automatic mid-service transfer to an unqualified colleague.
+
+Station failure: remove the station’s capacity and replan affected unstarted stages. An available stylist cannot compensate for missing required equipment.
+
+Recovery: keep active tasks and near-term accepted assignments stable. Replan the remaining horizon and publish meaningful changes; do not reshuffle the whole day every few seconds.
+
+Keep the original promised times, current estimates and actual timestamps separately. Recalculation must not rewrite the promise and erase evidence of a delay. Store estimate history with a reason and plan version.
+
+8. Client communication
+
+At booking, state the arrival requirement, intended service, pooled versus named commitment, expected start window, estimated visit duration, deposit terms and change policy. On arrival, give a ticket and the current expected wait for the first stage and approximate finish. Waiting for a named stylist or for required prep should be explained as such.
+
+Use estimated ranges, freshness time and plain reasons, rather than a false exact countdown. Before enough observations exist, show a provisional range requiring reception confirmation. If the schedule is stale or a significant task has no remaining-time estimate, say the estimate needs checking.
+
+For a walk-in example, reception can say: “The current installation start estimate is 11:10–11:30. A reserved 10:30 appointment is already included in that estimate. Would you like to wait or return at a later time?” These are example words, not a guarantee based on actual current staffing.
+
+Support confirmation/reminder/delay templates and consent/preferences in the design. Initially staff may review and communicate them through existing official channels. Automated WhatsApp/SMS/email requires a separately chosen provider, authorisation, consent workflow, delivery tracking and failure handling; no message is sent by this design task.
+
+A client-facing booking screen is a later release after staff-assisted scheduling works. It should offer only approved, freshly rechecked options, never public staff rosters or other clients’ details. Use authenticated sessions or restricted tokens rather than names/contact numbers in public URLs.
+
+9. Screens and minimum data entry
+
+Reception tablet
+
+Show branch, arrivals due, checked-in waiting, stage-ready clients, current work, next recommended actions, delay risks and capacity for new enquiries. A client card has arrival/appointment badges, planned path, current stage, wait range and the reason for its priority. Core actions are Check in, Add/change service, Assign/accept, Notify and Escalate.
+
+Capture name/contact and service intent once. Select preparation needs and preference with a small number of fields; derive task lists and timestamps. Avoid asking reception to re-enter each station’s queue. Allow brief reason codes instead of long narrative for common changes.
+
+Technician station and stylist phone
+
+A station tablet can show its authorised ready-work list with restricted client display names. A stylist’s personal phone shows their own accepted work, Start, Complete, Remaining-time update and Help, plus end-of-period confirmation. Station-queue access is a separate capability from own-task access; it must not give a stylist an unrestricted branch client directory.
+
+Use one completion action to timestamp the stage and record its performer. Passive setting timers are automatic reminders; a technician confirms readiness. No timer creates staff activity, stock consumption or a bill. Client contacts, private intake notes, payment references and financial controls stay out of technician responses.
+
+Manager and admin
+
+Managers see bottlenecks, delays, staffing gaps, overrides and disputed estimates within their permitted branches. Admin sees both branches, policy settings and reporting in private Sheets. Configure templates and shifts through validated forms or controlled admin actions so a raw row edit cannot silently invalidate live reservations.
+
+10. Data and state model
+
+Extend the existing V2 model; do not create a second client, order, payment or performer ledger for scheduling. Each appointment can lead to an actual visit, and each walk-in can have a visit without an appointment. An order may span a deposit before attendance, a visit and later pickup; a customer can have several visits. Link using permanent IDs rather than assuming one client, appointment, visit and order are the same record.
+
+BranchCalendar and OperatingException: timezone, opening/closing timestamps, reporting business date and exceptional hours.
+
+StaffSkill, Shift and AvailabilityException: valid skills, branch, hands-on availability, breaks, absence and effective times.
+
+Station and ResourceCalendar: type, branch, count or physical identity, availability, cleanup and occupancy rules.
+
+ServiceTemplateVersion and StageTemplate: mandatory/optional stages, precedence, min/max lags, hands-on/passive duration, required skills and resources. A lag may refer to start-to-start or finish-to-start; store the type explicitly.
+
+Appointment and CapacityHold: intended service, booking source, arrival requirement, first-start window, internal styling target if applicable, named/pooled scope, hold expiry and confirmed reservation.
+
+Visit and QueueTicket: actual check-in, display name, priority class, consent to changed options and visit status. A ticket is not a stock or payment receipt.
+
+TaskInstance and StageDependency: planned versus actual stage sequence, readiness, ready-since, performer, start/end and remaining-time updates.
+
+AssignmentOffer and ResourceReservation: staff/station interval, accept/expiry, provisional versus committed status, plan version and reassignment reason.
+
+EstimateSnapshot, ScheduleEvent and Override: original promise, current range, as-of time, cause, actor, version and affected records.
+
+CommunicationRequest and DeliveryEvent: approved content category, consent/channel, review status and delivery outcome if messaging is later implemented.
+
+Keep state domains separate: booking requested/held/confirmed/cancelled/no-show; visit checked-in/in-service/completed/left; task waiting-prerequisite/ready/offered/in-progress/setting/complete/blocked/cancelled; staff roster and live availability; payment status; and end-period acknowledgement. An unpaid balance does not mean a task is incomplete, and a finished task does not mean the client has paid.
+
+Use server timestamps, optimistic plan versions and idempotency keys for state transitions. A repeat Complete request creates one completion. Ignore an old scheduling response if its plan version has been superseded. Correcting a stage timestamp requires an audit trail and must not re-post the original order.
+
+11. Eight end-to-end scenarios
+
+These scenarios are design walkthroughs, not executed software tests. All unspecified durations and staffing are illustrative. The engine must use actual configured branch resources before making a promise.
+
+A. Pooled booking, no named stylist
+
+A client selects a standard installation. The system checks the complete route and offers an arrival time and expected first-stage window. A deposit is linked once to the order. On arrival, reception confirms needs and checks in the existing booking. The system offers each ready stage to an available qualified technician; it does not reserve the same stylist for washing through checkout. Completion records actual performers and checkout applies the existing deposit.
+
+B. A particular stylist requested
+
+A client wants Stylist A for styling. Show the next feasible route that fits A’s shift and existing commitments; another qualified person may prepare the client if agreed. If A is delayed, retain the named commitment, show the revised estimate and offer another stylist. Changing the named commitment requires consent. The client can retain the preference and its wait or accept a feasible pooled alternative.
+
+C. Standard-installation walk-in
+
+At 10:00 a walk-in needs no natural-hair preparation. Reception registers a visit and checks the required installation path. A future 10:30 booking is already protected. If this walk-in’s buffered path would occupy the reserved resource at 10:30, do not start it there; offer the next feasible window. If a separate qualified resource can complete the work without a conflict, use it and explain the actual estimate.
+
+D. Full prep, gluing and styling
+
+For an 11:00 internal styling target, use the illustrative sequence in section 4: arrive 09:30, complete prep by 10:20, begin glue by 10:30 and confirm readiness after required setting before 11:00 styling. The plan reserves prep resources, a glue technician, setting space and styling capacity. If prep cannot fit, offer a later route rather than booking styling alone and hoping the client becomes ready.
+
+E. Styling overruns
+
+An ongoing styling task expected to finish at 11:35 is still active. The stylist estimates another 20 minutes. Keep their resource occupied, record the overrun, update affected waits and protect the named-stylist promise where applicable. Suggest another qualified stylist for unstarted pooled work if one exists. Reception reviews meaningful delays with clients. Do not reset the original promised time or mark an unfinished service complete.
+
+F. A booked client arrives while walk-ins wait
+
+A 10:30 booking arrives on time while several walk-ins are waiting. The reservation has already been included in their estimates. If that client is ready for the due reserved stage, honour it. The oldest ready walk-in takes the next feasible unreserved resource; they do not lose their waiting history. If the booked client still needs prep, do not let them occupy a styling slot while unready: use any safe recoverable gap, flag the delayed route and avoid double-promising it.
+
+G. Extra service after check-in
+
+A client adds curling outside a revamp: KES 1,000 under the agreed price list. Add one billable line and its task or duration change to the same order, show the cost and revised completion estimate and recheck downstream capacity. If it cannot fit, offer a later finish, another permissible arrangement or a separate booking. Do not charge an included revamp finish again or consume the next client’s reservation without review.
+
+H. High-traffic day
+
+Styling has spare time, but the glue station is full and setting seats are nearly full. Do not open extra installation slots solely from stylist count. Limit new preparation/glue starts, show the bottleneck and accept only complete feasible journeys. A manager can activate a staffed overflow station or shift extension if genuinely available. Otherwise offer later times or stop accepting more waiting clients. Full chairs do not justify an unsafe or impossible schedule.
+
+12. Reports that improve operations
+
+Capture appointment promise, actual arrival, first hands-on start, stage ready/start/finish, passive setting, final service completion and checkout. Report booking lateness, arrival-to-first-service wait, ready-to-start wait by stage, total journey time, active service time and checkout delay separately. Required processing time must not be labelled avoidable waiting.
+
+Track median and high-percentile waits, appointment on-time starts, walk-in quote accuracy, abandonment, no-shows, overrun by service variant, station queues and backlog. Segment by branch, hour, service path and named versus pooled request. Preserve revised-estimate history so a constantly moving ETA cannot make prediction accuracy look better.
+
+Staff utilisation is hands-on occupied time divided by available staffed time, excluding planned breaks and absence. Track station occupancy separately, including passive occupation where applicable. Do not target 100% utilisation as the primary objective; lack of recovery capacity can damage the client experience. Avoid individual performance judgments before accounting for assigned service mix and bottlenecks.
+
+Measure fair work distribution among staff who were qualified and available, while retaining actual performer attribution for end-period confirmation. Count free clusters and included stages as work without inventing revenue. Analyse distinct clients separately from visits and tasks.
+
+13. Google implementation and scaling
+
+For the first controlled release, Sheets holds structured private records and Apps Script serves role-specific forms. Recalculate the affected branch/day after check-in, stage transitions, duration updates, staffing changes or booking commits. Use a limited refresh interval with a visible as-of time; this is near-real-time operational visibility, not a guarantee of instantaneous streaming.
+
+Avoid scanning full historical workbooks on every phone refresh or running a full-day optimiser on every keystroke. Keep bounded active-day records, versioned estimates and server-side indexes/caches as appropriate. Recheck hard availability at commitment time; a cached plan never authorises a conflicting booking.
+
+Google documents Apps Script execution and service quotas. Load-test expected staff devices, booking bursts and refresh frequency on the actual account before rollout. Stop new automatic confirmations if planning data is stale or the posting service fails; allow reception to create a clearly labelled request pending verification rather than an unbacked confirmed booking.
+
+Start with rule-based candidate insertion, explicit ready checks and assignment recommendations. Consider a constraint solver or transactional database only if measured scale, forecasting or schedule quality warrants it. A separate scheduling service can then preserve the same IDs and permission contracts. OR-Tools documentation illustrates resource and workforce constraints; adopting that solver is not a dependency or cost commitment in this proposal.
+
+14. Policies requiring owner agreement
+
+Client promise: recommended arrival time plus first-start window; whether internal styling targets are shown, and acceptable delay notification thresholds.
+
+Preferred stylist: soft request versus confirmed commitment, stages covered, reassignment consent and how requests are discouraged without misleading clients.
+
+Lateness: check-in lead, grace period, hold release, re-entry and cancellation/deposit terms. No proposed number is silently adopted.
+
+Walk-ins: maximum acceptable wait, admission stop/escalation, recovery buffer, any dynamic reserved allowance and release cutoff.
+
+Durations and safety: actual stage estimates, cleanup, product-specific setting rules, permitted parallel work and maximum comfortable post-setting wait.
+
+Resources: actual branch stations, shifts, skills, breaks, absence handling, last start, shift handoffs and midnight business-date policy.
+
+Overrides: who may change priorities, approve overtime and accept delays; which client changes require explicit consent. Safety/skill/resource constraints remain hard.
+
+Communication: approved templates, channels, consent, reminder/delay policy and whether automation should be procured later.
+
+These decisions do not block evaluating the architecture. They do block activating dependent customer promises and automatic scheduling policies. Capture them in the decision register and test each rule before production.
+
+15. Delivery sequence and acceptance
+
+Add scheduling requirements to P0 now: define the appointment promise, stage graph, role contract and policy decisions. P1 reserves access-safe event and resource schema. P3 establishes linked deposits/order changes. P4 delivers capacity calculation, assisted booking, check-in, stage queues and recommendation-mode assignment before any public self-booking. P5 reuses task performers for phone confirmation; P6 adds flow metrics; P7 validates real-device operation and peak-day rehearsals.
+
+Do not add every advanced feature to the first release. First obtain reliable check-in, stage completion and shift data with minimal taps. Then enable feasible capacity offers and guided assignment, compare estimates to actuals, tune buffers and later consider self-booking and notifications. No opaque AI allocator or complex optimisation is required to establish these foundations.
+
+Acceptance must include all eight walkthroughs plus: simultaneous booking of the last feasible slot; one multi-skilled staff member counted twice; expired hold with a late deposit; actual setting readiness; overdue active task; cross-midnight shift; absence after confirmation; named-stylist consent; offline/stale tablet; denied branch/staff-ID spoof; and stylist responses with no client contacts. Each result must identify the implemented version, fixture, expected outcome and observed outcome.
+
+Current status: design proposal for review. No implementation gate has passed and no scheduling software test has been executed. The old workbook and app remain unchanged. The new V2 project state should record P0 in progress with this document as design evidence, while all later phases remain not started.
+
+Appendix — Scheduling approach comparison
+
+The comparison summarises the options assessed in section 2. The hybrid approach is the recommendation, subject to the operational policy decisions above.
+
+
+
+Approach | Advantage | Main risk | Recommended use
+
+Fixed one-hour slots | Familiar and simple | Ignores varied stages, skills and station bottlenecks | Optional display choice only; validate the whole route
+
+Single arrival-order queue | Easy arrival fairness | Breaks commitments; unready clients block flow | Tie-breaker among comparable eligible clients
+
+Fixed named staff for all work | Specific advance allocation | Brittle under absence and overruns; loses pooling | Confirmed named requests or specialist stages
+
+Hybrid capacity + stage queues | Protects promises and allows qualified pooling | Needs accurate shifts, templates and status updates | Recommended; begin with explainable guided assignment

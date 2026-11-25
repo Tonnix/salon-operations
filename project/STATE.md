@@ -1,0 +1,2 @@
+# Project state
+Current phase: P0 — not started. All later phases not started. No live code, Drive resources or deployment verified. Starter scaffold only. Next action: owner and orchestrator review P0 decisions. Last evidence: local scaffold tests (see tests/). Gate approval: none. Update this file after every task with phase, task, commit, changed files, tests (actual vs pending), blockers, next action and owner approval reference.

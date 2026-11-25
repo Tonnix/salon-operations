@@ -1,0 +1,1 @@
+Prepare release only after owner approval. Verify target environment and Drive IDs, tests, backup and rollback, clean source and no secrets. Package versioned artifact and checksum. Ask explicit authorization before any clasp push, deployment or Drive upload. Record returned IDs and actual outcomes; never claim success from a plan.
