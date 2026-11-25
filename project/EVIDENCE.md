@@ -1,5 +1,12 @@
 # Evidence log
 
+## REPO-002 — Publish existing ignore rules — 2026-11-25
+- Requirement: owner's explicit follow-up to stage, commit and push; AGENTS.md task evidence requirement. Scope: existing .gitignore edit and task records; schema/API contracts unchanged.
+- Local validation: npm.cmd test passed 3/3, including existing fail-closed and readiness negative cases. git diff --check passed.
+- Ignore validation: git check-ignore --no-index -q with individual path arguments passed for 12 expected ignored probes (dependencies, Google configuration/credentials, environments, keys and local records) and 2 expected trackable probes (.env.example and src/App.gs). Initial PowerShell stdin probe retained carriage returns; individual-argument rerun corrected the test transport.
+- Existing edit replaces releases/, *.log and private/ exclusions with the supplied credential/local-record rules; those former patterns are no longer excluded by this file. No files from those locations are staged by this task.
+- Integration: push and remote HEAD comparison follow commit creation; no application deployment or live-sheet tests required or performed. No phase gate approved. Next action remains P0 owner decision review.
+
 ## REPO-001 — Initial repository publication — 2026-11-25
 - Requirement: explicit owner request to set the SSH remote and push the initial commit; AGENTS.md task recording and independent review requirements. No schema/API changes or new application behavior; existing negative tests apply.
 - Fixture/version: existing scaffold baseline `3ff845b`; Git branch master. Existing .gitignore edit excluded from task changes.

@@ -1,7 +1,21 @@
-.clasp.json
-.clasprc.json
-.env*
 node_modules/
-releases/
-*.log
-private/
+
+# Google credentials and local configuration
+.clasprc.json
+.clasp.json
+credentials.json
+client_secret*.json
+service-account*.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Private keys
+*.pem
+*.key
+
+# Local records
+backups/
+private-data/
