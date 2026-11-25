@@ -1,2 +1,5 @@
 # Project state
+
+## Repository setup — 2026-11-25
+Task REPO-001: owner requested origin `git@github.com:Tonnix/salon-operations.git` and initial publication. Baseline commit `3ff845b` pushed successfully to `origin/master`; upstream tracking configured. Independent QA review found no publication blocker. Offline tests: 3 passed, 0 failed. Changed task records: project/STATE.md and project/EVIDENCE.md; existing uncommitted .gitignore edit preserved. Schema/API contracts unchanged; no application changes. Phase remains P0, not started; no gate approval. Next action remains owner/orchestrator P0 decision review. Authorization: owner's repository setup request in this session. See REPO-001 evidence below in project/EVIDENCE.md.
 Current phase: P0 — not started. All later phases not started. No live code, Drive resources or deployment verified. Starter scaffold only. Next action: owner and orchestrator review P0 decisions. Last evidence: local scaffold tests (see tests/). Gate approval: none. Update this file after every task with phase, task, commit, changed files, tests (actual vs pending), blockers, next action and owner approval reference.
